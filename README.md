@@ -21,4 +21,4 @@ A fun and interactive **hill climbing game** where players control the car using
 ## 📱 Installation  
 1. Clone the repository:  
    ```sh
-   git clone https://github.com/OroMove/hill-climber-game.git
+   git clone https://github.com/OroMove/mouth-detection-hill-climber.git
