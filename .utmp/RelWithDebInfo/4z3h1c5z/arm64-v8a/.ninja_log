@@ -1,0 +1,23 @@
+# ninja log v5
+32	2622	7603645411296823	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	232e048386254fbf
+196	609	7603645391675825	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	7af0a7de97219680
+611	1181	7603645397407276	C:/Game/HillClimberGame/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/4z3h1c5z/obj/arm64-v8a/libswappywrapper.so	c9db2e8e764f79a3
+153	1812	7603645403588116	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	4b03f0af7d5c530d
+101	1815	7603645403703743	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	580d82c123d6f833
+174	1996	7603645405477608	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	6dd1f1182531bc97
+116	1847	7603645404013492	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	89df794ae1b0e2f2
+53	2045	7603645405999837	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	504e35aa47d57432
+16	1751	7603645403032391	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	b0cb89e069d9ddc6
+135	2423	7603645409610668	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	4cd7be7500712e8c
+2623	2994	7603645415448560	C:/Game/HillClimberGame/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/4z3h1c5z/obj/arm64-v8a/libgame.so	f53558ca372deb79
+379	839	7608778228604937	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	7af0a7de97219680
+840	1304	7608778233249364	C:/Game/HillClimberGame/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/4z3h1c5z/obj/arm64-v8a/libswappywrapper.so	c9db2e8e764f79a3
+261	1643	7608778236489177	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	4b03f0af7d5c530d
+302	1663	7608778236732864	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	89df794ae1b0e2f2
+123	1665	7608778236722899	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	580d82c123d6f833
+342	1763	7608778237727566	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	6dd1f1182531bc97
+166	1837	7608778238503907	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	504e35aa47d57432
+22	1850	7608778238595065	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	b0cb89e069d9ddc6
+209	2020	7608778240417550	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	4cd7be7500712e8c
+79	2175	7608778241601243	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	232e048386254fbf
+2176	2520	7608778245281508	C:/Game/HillClimberGame/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/4z3h1c5z/obj/arm64-v8a/libgame.so	f53558ca372deb79
