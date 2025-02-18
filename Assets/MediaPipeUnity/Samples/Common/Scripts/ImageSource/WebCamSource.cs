@@ -114,68 +114,62 @@ namespace Mediapipe.Unity
     public override bool isPrepared => webCamTexture != null;
     public override bool isPlaying => webCamTexture != null && webCamTexture.isPlaying;
 
-    private IEnumerator Initialize()
-    {
-      yield return GetPermission();
-
-      if (!_IsPermitted)
-      {
-        yield break;
-      }
-
-      if (webCamDevice != null)
-      {
-        yield break;
-      }
-
-      availableSources = WebCamTexture.devices;
-
-      if (availableSources != null && availableSources.Length > 0)
-      {
-        webCamDevice = availableSources[0];
-      }
-    }
-
-    private IEnumerator GetPermission()
-    {
-      lock (_PermissionLock)
-      {
-        if (_IsPermitted)
+        private IEnumerator Initialize()
         {
-          yield break;
+            yield return RequestCameraPermission(); // Step 1: Ask for permission
+
+            if (!_IsPermitted)
+            {
+                Debug.LogWarning("Camera permission denied.");
+                yield break; // Exit if permission is not granted
+            }
+
+            availableSources = WebCamTexture.devices; // Get available cameras
+
+            if (availableSources != null && availableSources.Length > 0)
+            {
+                // Step 2: Select the Front Camera by Default
+                var frontCamera = availableSources.FirstOrDefault(device => device.isFrontFacing);
+                webCamDevice = frontCamera.name != null ? frontCamera : availableSources[0];
+
+            }
         }
+
+
+        private IEnumerator RequestCameraPermission()
+        {
+            lock (_PermissionLock)
+            {
+                if (_IsPermitted) yield break; // Skip if already permitted
 
 #if UNITY_ANDROID
         if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
         {
-          Permission.RequestUserPermission(Permission.Camera);
-          yield return new WaitForSeconds(0.1f);
+            Permission.RequestUserPermission(Permission.Camera);
+            yield return new WaitForSeconds(1.0f); // Wait for user response
         }
 #elif UNITY_IOS
-        if (!Application.HasUserAuthorization(UserAuthorization.WebCam)) {
-          yield return Application.RequestUserAuthorization(UserAuthorization.WebCam);
+        if (!Application.HasUserAuthorization(UserAuthorization.WebCam))
+        {
+            yield return Application.RequestUserAuthorization(UserAuthorization.WebCam);
         }
 #endif
 
 #if UNITY_ANDROID
-        if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
-        {
-          Debug.LogWarning("Not permitted to use Camera");
-          yield break;
-        }
+        _IsPermitted = Permission.HasUserAuthorizedPermission(Permission.Camera);
 #elif UNITY_IOS
-        if (!Application.HasUserAuthorization(UserAuthorization.WebCam)) {
-          Debug.LogWarning("Not permitted to use WebCam");
-          yield break;
-        }
+        _IsPermitted = Application.HasUserAuthorization(UserAuthorization.WebCam);
 #endif
-        _IsPermitted = true;
 
-        yield return new WaitForEndOfFrame();
-      }
-    }
+                if (!_IsPermitted)
+                {
+                    Debug.LogWarning("User denied camera access.");
+                }
+            }
+        }
 
-    public override void SelectSource(int sourceId)
+
+        public override void SelectSource(int sourceId)
     {
       if (sourceId < 0 || sourceId >= availableSources.Length)
       {
@@ -185,20 +179,21 @@ namespace Mediapipe.Unity
       webCamDevice = availableSources[sourceId];
     }
 
-    public override IEnumerator Play()
-    {
-      yield return Initialize();
-      if (!_IsPermitted)
-      {
-        throw new InvalidOperationException("Not permitted to access cameras");
-      }
+        public override IEnumerator Play()
+        {
+            yield return Initialize(); // Ensure permission and camera setup
+            if (!_IsPermitted)
+            {
+                throw new InvalidOperationException("Camera permission not granted.");
+            }
 
-      InitializeWebCamTexture();
-      webCamTexture.Play();
-      yield return WaitForWebCamTexture();
-    }
+            InitializeWebCamTexture(); // Start webcam
+            webCamTexture.Play();
+            yield return WaitForWebCamTexture();
+        }
 
-    public override IEnumerator Resume()
+
+        public override IEnumerator Resume()
     {
       if (!isPrepared)
       {

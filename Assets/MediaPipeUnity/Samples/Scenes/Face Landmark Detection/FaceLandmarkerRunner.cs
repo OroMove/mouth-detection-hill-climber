@@ -1,9 +1,3 @@
-// Copyright (c) 2023 homuler
-//
-// Use of this source code is governed by an MIT-style
-// license that can be found in the LICENSE file or at
-// https://opensource.org/licenses/MIT.
-
 using System.Collections;
 using Mediapipe.Tasks.Vision.FaceLandmarker;
 using UnityEngine;
@@ -11,137 +5,169 @@ using UnityEngine.Rendering;
 
 namespace Mediapipe.Unity.Sample.FaceLandmarkDetection
 {
-  public class FaceLandmarkerRunner : VisionTaskApiRunner<FaceLandmarker>
-  {
-    [SerializeField] private FaceLandmarkerResultAnnotationController _faceLandmarkerResultAnnotationController;
-
-    private Experimental.TextureFramePool _textureFramePool;
-
-    public readonly FaceLandmarkDetectionConfig config = new FaceLandmarkDetectionConfig();
-
-    public override void Stop()
+    public class FaceLandmarkerRunner : VisionTaskApiRunner<FaceLandmarker>
     {
-      base.Stop();
-      _textureFramePool?.Dispose();
-      _textureFramePool = null;
-    }
+        [SerializeField] private FaceLandmarkerResultAnnotationController _faceLandmarkerResultAnnotationController;
+        [SerializeField] private CarController carController; // Reference to CarController
 
-    protected override IEnumerator Run()
-    {
-      Debug.Log($"Delegate = {config.Delegate}");
-      Debug.Log($"Running Mode = {config.RunningMode}");
-      Debug.Log($"NumFaces = {config.NumFaces}");
-      Debug.Log($"MinFaceDetectionConfidence = {config.MinFaceDetectionConfidence}");
-      Debug.Log($"MinFacePresenceConfidence = {config.MinFacePresenceConfidence}");
-      Debug.Log($"MinTrackingConfidence = {config.MinTrackingConfidence}");
-      Debug.Log($"OutputFaceBlendshapes = {config.OutputFaceBlendshapes}");
-      Debug.Log($"OutputFacialTransformationMatrixes = {config.OutputFacialTransformationMatrixes}");
+        private Experimental.TextureFramePool _textureFramePool;
+        public readonly FaceLandmarkDetectionConfig config = new FaceLandmarkDetectionConfig();
 
-      yield return AssetLoader.PrepareAssetAsync(config.ModelPath);
+        public float MouthOpeningDistance { get; private set; }
 
-      var options = config.GetFaceLandmarkerOptions(config.RunningMode == Tasks.Vision.Core.RunningMode.LIVE_STREAM ? OnFaceLandmarkDetectionOutput : null);
-      taskApi = FaceLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
-      var imageSource = ImageSourceProvider.ImageSource;
-
-      yield return imageSource.Play();
-
-      if (!imageSource.isPrepared)
-      {
-        Debug.LogError("Failed to start ImageSource, exiting...");
-        yield break;
-      }
-
-      // Use RGBA32 as the input format.
-      // TODO: When using GpuBuffer, MediaPipe assumes that the input format is BGRA, so maybe the following code needs to be fixed.
-      _textureFramePool = new Experimental.TextureFramePool(imageSource.textureWidth, imageSource.textureHeight, TextureFormat.RGBA32, 10);
-
-      // NOTE: The screen will be resized later, keeping the aspect ratio.
-      screen.Initialize(imageSource);
-
-      SetupAnnotationController(_faceLandmarkerResultAnnotationController, imageSource);
-
-      var transformationOptions = imageSource.GetTransformationOptions();
-      var flipHorizontally = transformationOptions.flipHorizontally;
-      var flipVertically = transformationOptions.flipVertically;
-      var imageProcessingOptions = new Tasks.Vision.Core.ImageProcessingOptions(rotationDegrees: (int)transformationOptions.rotationAngle);
-
-      AsyncGPUReadbackRequest req = default;
-      var waitUntilReqDone = new WaitUntil(() => req.done);
-      var result = FaceLandmarkerResult.Alloc(options.numFaces);
-
-      // NOTE: we can share the GL context of the render thread with MediaPipe (for now, only on Android)
-      var canUseGpuImage = options.baseOptions.delegateCase == Tasks.Core.BaseOptions.Delegate.GPU &&
-        SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3 &&
-        GpuManager.GpuResources != null;
-      using var glContext = canUseGpuImage ? GpuManager.GetGlContext() : null;
-
-      while (true)
-      {
-        if (isPaused)
+        public override void Stop()
         {
-          yield return new WaitWhile(() => isPaused);
+            base.Stop();
+            _textureFramePool?.Dispose();
+            _textureFramePool = null;
         }
 
-        if (!_textureFramePool.TryGetTextureFrame(out var textureFrame))
+        protected override IEnumerator Run()
         {
-          yield return new WaitForEndOfFrame();
-          continue;
-        }
+            Debug.Log($"Delegate = {config.Delegate}");
+            Debug.Log($"Running Mode = {config.RunningMode}");
+            Debug.Log($"NumFaces = {config.NumFaces}");
+            Debug.Log($"MinFaceDetectionConfidence = {config.MinFaceDetectionConfidence}");
+            Debug.Log($"MinFacePresenceConfidence = {config.MinFacePresenceConfidence}");
+            Debug.Log($"MinTrackingConfidence = {config.MinTrackingConfidence}");
+            Debug.Log($"OutputFaceBlendshapes = {config.OutputFaceBlendshapes}");
+            Debug.Log($"OutputFacialTransformationMatrixes = {config.OutputFacialTransformationMatrixes}");
 
-        // Build the input Image
-        Image image;
-        if (canUseGpuImage)
-        {
-          yield return new WaitForEndOfFrame();
-          textureFrame.ReadTextureOnGPU(imageSource.GetCurrentTexture(), flipHorizontally, flipVertically);
-          image = textureFrame.BuildGpuImage(glContext);
-        }
-        else
-        {
-          req = textureFrame.ReadTextureAsync(imageSource.GetCurrentTexture(), flipHorizontally, flipVertically);
-          yield return waitUntilReqDone;
+            yield return AssetLoader.PrepareAssetAsync(config.ModelPath);
 
-          if (req.hasError)
-          {
-            Debug.LogError($"Failed to read texture from the image source, exiting...");
-            break;
-          }
-          image = textureFrame.BuildCPUImage();
-          textureFrame.Release();
-        }
+            var options = config.GetFaceLandmarkerOptions(config.RunningMode == Tasks.Vision.Core.RunningMode.LIVE_STREAM ? OnFaceLandmarkDetectionOutput : null);
+            taskApi = FaceLandmarker.CreateFromOptions(options, GpuManager.GpuResources);
+            var imageSource = ImageSourceProvider.ImageSource;
 
-        switch (taskApi.runningMode)
-        {
-          case Tasks.Vision.Core.RunningMode.IMAGE:
-            if (taskApi.TryDetect(image, imageProcessingOptions, ref result))
+            yield return imageSource.Play();
+
+            if (!imageSource.isPrepared)
             {
-              _faceLandmarkerResultAnnotationController.DrawNow(result);
+                Debug.LogError("Failed to start ImageSource, exiting...");
+                yield break;
+            }
+
+            _textureFramePool = new Experimental.TextureFramePool(imageSource.textureWidth, imageSource.textureHeight, TextureFormat.RGBA32, 10);
+            screen.Initialize(imageSource);
+            SetupAnnotationController(_faceLandmarkerResultAnnotationController, imageSource);
+
+            var transformationOptions = imageSource.GetTransformationOptions();
+            var flipHorizontally = transformationOptions.flipHorizontally;
+            var flipVertically = transformationOptions.flipVertically;
+            var imageProcessingOptions = new Tasks.Vision.Core.ImageProcessingOptions(rotationDegrees: (int)transformationOptions.rotationAngle);
+
+            AsyncGPUReadbackRequest req = default;
+            var waitUntilReqDone = new WaitUntil(() => req.done);
+            var result = FaceLandmarkerResult.Alloc(options.numFaces);
+
+            var canUseGpuImage = options.baseOptions.delegateCase == Tasks.Core.BaseOptions.Delegate.GPU &&
+                                  SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3 &&
+                                  GpuManager.GpuResources != null;
+            using var glContext = canUseGpuImage ? GpuManager.GetGlContext() : null;
+
+            while (true)
+            {
+                if (isPaused)
+                {
+                    yield return new WaitWhile(() => isPaused);
+                }
+
+                if (!_textureFramePool.TryGetTextureFrame(out var textureFrame))
+                {
+                    yield return new WaitForEndOfFrame();
+                    continue;
+                }
+
+                Image image;
+                if (canUseGpuImage)
+                {
+                    yield return new WaitForEndOfFrame();
+                    textureFrame.ReadTextureOnGPU(imageSource.GetCurrentTexture(), flipHorizontally, flipVertically);
+                    image = textureFrame.BuildGpuImage(glContext);
+                }
+                else
+                {
+                    req = textureFrame.ReadTextureAsync(imageSource.GetCurrentTexture(), flipHorizontally, flipVertically);
+                    yield return waitUntilReqDone;
+
+                    if (req.hasError)
+                    {
+                        Debug.LogError($"Failed to read texture from the image source, exiting...");
+                        break;
+                    }
+                    image = textureFrame.BuildCPUImage();
+                    textureFrame.Release();
+                }
+
+                switch (taskApi.runningMode)
+                {
+                    case Tasks.Vision.Core.RunningMode.IMAGE:
+                    case Tasks.Vision.Core.RunningMode.VIDEO:
+                        if (taskApi.TryDetect(image, imageProcessingOptions, ref result))
+                        {
+                            ProcessFaceLandmarks(result);
+                            _faceLandmarkerResultAnnotationController.DrawNow(result);
+                        }
+                        else
+                        {
+                            _faceLandmarkerResultAnnotationController.DrawNow(default);
+                        }
+                        break;
+                    case Tasks.Vision.Core.RunningMode.LIVE_STREAM:
+                        taskApi.DetectAsync(image, GetCurrentTimestampMillisec(), imageProcessingOptions);
+                        break;
+                }
+            }
+        }
+
+        private void OnFaceLandmarkDetectionOutput(FaceLandmarkerResult result, Image image, long timestamp)
+        {
+            ProcessFaceLandmarks(result);
+            _faceLandmarkerResultAnnotationController.DrawLater(result);
+        }
+
+        private void ProcessFaceLandmarks(FaceLandmarkerResult result)
+        {
+            if (result.faceLandmarks == null || result.faceLandmarks.Count == 0)
+            {
+                Debug.Log("No face detected.");
+                return;
+            }
+
+            var faceLandmarks = result.faceLandmarks[0].landmarks;
+
+            if (faceLandmarks == null || faceLandmarks.Count < 15)
+            {
+                Debug.Log("Not enough landmarks detected.");
+                return;
+            }
+
+            var topLip = faceLandmarks[13];
+            var bottomLip = faceLandmarks[14];
+
+            float mouthOpeningDistance = Vector2.Distance(
+                new Vector2(topLip.x, topLip.y),
+                new Vector2(bottomLip.x, bottomLip.y)
+            );
+
+            float closedMouthThreshold = 0.01f;
+
+            if (mouthOpeningDistance < closedMouthThreshold)
+            {
+                mouthOpeningDistance = 0f;
+                Debug.Log("Mouth Closed");
             }
             else
             {
-              _faceLandmarkerResultAnnotationController.DrawNow(default);
+                Debug.Log($"Mouth Opening Distance: {mouthOpeningDistance}");
             }
-            break;
-          case Tasks.Vision.Core.RunningMode.VIDEO:
-            if (taskApi.TryDetectForVideo(image, GetCurrentTimestampMillisec(), imageProcessingOptions, ref result))
-            {
-              _faceLandmarkerResultAnnotationController.DrawNow(result);
-            }
-            else
-            {
-              _faceLandmarkerResultAnnotationController.DrawNow(default);
-            }
-            break;
-          case Tasks.Vision.Core.RunningMode.LIVE_STREAM:
-            taskApi.DetectAsync(image, GetCurrentTimestampMillisec(), imageProcessingOptions);
-            break;
-        }
-      }
-    }
 
-    private void OnFaceLandmarkDetectionOutput(FaceLandmarkerResult result, Image image, long timestamp)
-    {
-      _faceLandmarkerResultAnnotationController.DrawLater(result);
+            MouthOpeningDistance = mouthOpeningDistance;
+
+            if (carController != null)
+            {
+                carController.SetMouthOpeningDistance(mouthOpeningDistance);
+            }
+        }
     }
-  }
 }

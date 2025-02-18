@@ -1,26 +1,44 @@
 using UnityEngine;
-using UnityEngine.UI;
-using System.Collections;
+using UnityEngine.UI; // For UI components like Image and Text
+using System.Collections.Generic; // For storing distances and speeds in lists
 
 public class CarController : MonoBehaviour
 {
-    private int moveDirection;
     public float fuelLevel = 1f; // Assuming max is 1
     public float fuelConsumptionRate;
 
-    public Image fuelBar;
+    public Image fuelBar; // Image component for fuel bar
     public Gradient fuelGradient; // Gradient for color change
 
     public float torqueForce = 150f;
-    public float carTorque = 300f;
-    public float horizontalInput;
+    public float baseSpeed = 150f; // Initial speed
+    private float mouthOpeningDistance = 0f;
+    public float MouthOpeningDistance => mouthOpeningDistance; // Read-only property
+    public float maxSpeedFromMouthOpening = 0f; // Track max speed from mouth opening distance
+
+    private List<float> mouthOpeningDistances = new List<float>(); // Store all mouth opening distances
+    private List<float> speeds = new List<float>(); // Store all speeds corresponding to mouth opening distances
+
+    public List<float> GetNonZeroMouthOpeningDistances() => mouthOpeningDistances; // Get mouth opening distances
+    public List<float> GetSpeeds() => speeds; // Get all corresponding speeds
+
     public Rigidbody2D frontWheel;
     public Rigidbody2D rearWheel;
     public Rigidbody2D carBody;
 
+    public Text speedText; // Text component to display speed
+    public GameObject finishFlag; // Reference to the finish line flag
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.gameObject == finishFlag) // When colliding with the finish line
+        {
+            FindObjectOfType<GameManager>().LevelComplete(); // Trigger level completion
+        }
+    }
+
     void Update()
     {
-        CaptureInput();
         fuelBar.fillAmount = fuelLevel;
         fuelBar.color = fuelGradient.Evaluate(fuelLevel); // Set color based on fuel level
     }
@@ -29,56 +47,73 @@ public class CarController : MonoBehaviour
     {
         if (fuelLevel > 0)
         {
-            ApplyMovement();
-            ApplyMobileMovement();
+            MouthDetectionMovement();
         }
         ManageFuelConsumption();
     }
 
-    void CaptureInput()
+    void MouthDetectionMovement()
     {
-        horizontalInput = Input.GetAxis("Horizontal");
-    }
+        if (mouthOpeningDistance > 0f) // Even the slightest opening accelerates
+        {
+            float speedOfCar = Mathf.Min(400f, 50f + 25f * (mouthOpeningDistance / 0.01f));
 
-    void ApplyMovement()
-    {
-        float torque = -horizontalInput * torqueForce * Time.fixedDeltaTime;
+            Debug.Log("Mouth Opening Distance: " + mouthOpeningDistance + ", Speed: " + speedOfCar);
 
-        frontWheel.AddTorque(torque * 0.8f);
-        rearWheel.AddTorque(torque * 0.8f);
+            // Store the maximum speed reached based on mouth opening distance
+            if (speedOfCar > maxSpeedFromMouthOpening)
+            {
+                maxSpeedFromMouthOpening = speedOfCar;
+            }
 
-        carBody.AddTorque(-torque * 0.5f);
-    }
+            // Store all mouth opening distances and their corresponding speeds
+            mouthOpeningDistances.Add(mouthOpeningDistance);
+            speeds.Add(speedOfCar);
 
-    void ApplyMobileMovement()
-    {
-        float torque = moveDirection * torqueForce * Time.fixedDeltaTime;
+            speedText.text = "Speed: " + Mathf.Round(speedOfCar).ToString();
 
-        frontWheel.AddTorque(torque * 0.8f);
-        rearWheel.AddTorque(torque * 0.8f);
+            float adjustedTorque = speedOfCar * Time.fixedDeltaTime;
+            rearWheel.AddTorque(-adjustedTorque);
+            frontWheel.AddTorque(-adjustedTorque);
+        }
+        else // Mouth fully closed, apply smooth braking
+        {
+            float brakeForce = 3f; // Smooth braking factor
 
-        carBody.AddTorque(-torque * 0.5f);
+            // Gradually reduce velocity
+            rearWheel.linearVelocity = Vector2.Lerp(rearWheel.linearVelocity, Vector2.zero, Time.fixedDeltaTime * brakeForce);
+            frontWheel.linearVelocity = Vector2.Lerp(frontWheel.linearVelocity, Vector2.zero, Time.fixedDeltaTime * brakeForce);
+
+            // Force stop when speed is very low
+            if (rearWheel.linearVelocity.magnitude < 0.1f)
+            {
+                rearWheel.linearVelocity = Vector2.zero;
+                frontWheel.linearVelocity = Vector2.zero;
+            }
+
+            // Update UI with actual speed
+            float currentSpeed = rearWheel.linearVelocity.magnitude * 10f; // Scale for readability
+            speedText.text = "Speed: " + Mathf.Round(currentSpeed).ToString();
+        }
     }
 
     void ManageFuelConsumption()
     {
-        fuelLevel -= fuelConsumptionRate * Mathf.Abs(horizontalInput) * Time.fixedDeltaTime;
-        fuelLevel -= fuelConsumptionRate * Mathf.Abs(moveDirection) * Time.deltaTime;
-        fuelLevel = Mathf.Clamp01(fuelLevel); // Keep it between 0 and 1
-    }
+        // Calculate the distance the car moves (magnitude of the velocity vector)
+        float distanceMoved = carBody.linearVelocity.magnitude * Time.deltaTime; // Speed multiplied by Time.deltaTime gives distance
 
-    public void SetMobileInput(int direction)
-    {
-        moveDirection = direction;
-    }
-
-    public GameObject flag;
-
-    private void OnTriggerEnter2D(Collider2D other)
-    {
-        if (other.gameObject == flag)
+        // If the car moves forward or backward, reduce fuel by 2% per meter
+        if (distanceMoved > 0f)
         {
-            FindObjectOfType<GameManager>().EndGameInstantly();
+            fuelLevel -= 0.01f * distanceMoved; // 2% fuel reduction per meter
         }
+
+        // Ensure fuel stays within 0 to 1 range
+        fuelLevel = Mathf.Clamp01(fuelLevel);
+    }
+
+    public void SetMouthOpeningDistance(float distance)
+    {
+        mouthOpeningDistance = distance;
     }
 }
